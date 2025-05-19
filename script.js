@@ -49,7 +49,7 @@ const aiCharDescriptionTextarea = document.getElementById("ai-char-description")
 const aiCharPersonalityTextarea = document.getElementById("ai-char-personality");
 const saveAiCharacterButton = document.getElementById("save-ai-character-button");
 const cancelAiCharacterButton = document.getElementById("cancel-ai-character-button");
-let editingAiCharacterId = null; // To store ID of character being edited
+let editingAiCharacterId = null;
 
 // User Persona Elements
 const userPersonaSelect = document.getElementById("user-persona-select");
@@ -62,14 +62,14 @@ const userPersonaNameInput = document.getElementById("user-persona-name");
 const userPersonaDescriptionTextarea = document.getElementById("user-persona-description");
 const saveUserPersonaButton = document.getElementById("save-user-persona-button");
 const cancelUserPersonaButton = document.getElementById("cancel-user-persona-button");
-let editingUserPersonaId = null; // To store ID of persona being edited
+let editingUserPersonaId = null;
 
 // --- Configuration & State ---
 const API_URL = "https://llm.chutes.ai/v1/chat/completions";
 let chutesApiKey = "";
 let currentModel = "deepseek-ai/DeepSeek-V3-0324";
 
-const DEFAULT_VELLY_SYSTEM_PROMPT = `You are Velly, a helpful and friendly AI assistant.
+const DEFAULT_VELLY_SYSTEM_PROMPT = `You are an AI assistant.
 Your primary goal is to assist the user with their requests, provide information, and engage in conversation.
 Maintain a positive and supportive tone.
 You have access to Markdown for formatting your responses. Use it to enhance readability and expressiveness.
@@ -86,21 +86,21 @@ Special formatting keywords you can use at the START of a line (these are illust
 - (white)text is your normal speaking style.
 If no keyword is used, your text will be white by default.
 
-**Important Note on Conversation History & Edits:** The user interface allows the user to *edit your previous responses*. The message history you are about to receive reflects the *current state* of the conversation, including any such user edits to messages that were originally yours. When you form your next response, treat the content of each message in the history (regardless of original authorship if it was an 'assistant' role that got edited) as the ground truth for continuing the dialogue. Your goal is to maintain a coherent and engaging conversation based on this *presented history*, even if an 'assistant' message in the history was modified by the user from what you might have said originally. Adapt naturally to the flow of this (potentially edited) history while staying true to your core persona defined by this system prompt (or a custom one if selected).`;
+**Important Note on Conversation History & Edits:** The user interface allows the user to *edit your previous responses*. The message history you are about to receive reflects the *current state* of the conversation, including any such user edits to messages that were originally yours. When you form your next response, treat the content of each message in the history (regardless of original authorship if it was an 'assistant' role that got edited) as the ground truth for continuing the dialogue. Your goal is to maintain a coherent and engaging conversation based on this *presented history*, even if an 'assistant' message in the history was modified by the user from what you might have said originally. Adapt naturally to the flow of this (potentially edited) history while staying true to your core persona defined by this system prompt (or a custom one if selected, which may include specific details like your name, age, gender, and appearance).`;
 
-let messages = []; // Messages for the current chat
+
+let messages = [];
 let isLoading = false;
 let currentChat = { id: generateId(), title: "New Chat", messages: [] };
-let chats = []; // All stored chats
-let editingMessage = null; // For editing a message bubble content
+let chats = [];
+let editingMessage = null;
 
-// Profile & Persona State
 let aiCharacters = [];
 let userPersonas = [];
 let activeAiCharacterId = null;
 let activeUserPersonaId = null;
 
-const icons = { // Reusing from original script
+const icons = {
     copy: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>',
     delete: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>',
     edit: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
@@ -113,36 +113,26 @@ const icons = { // Reusing from original script
     userDefaultIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`
 };
 
-// --- Initialization ---
 function init() {
     loadAppSettings();
     loadAiCharacters();
     loadUserPersonas();
-    loadChatHistory(); // Must be after profiles are loaded to set initial chat title correctly
-
-    updateChatHeaderBasedOnAiCharacter(); // Initial setup
-    addWelcomeMessageIfNeeded(); // Depends on active AI character
-
+    loadChatHistory();
+    updateChatHeaderBasedOnAiCharacter();
+    addWelcomeMessageIfNeeded();
     adjustInputHeight();
     setupEventListeners();
     renderMessages();
-    renderChatHistoryList(); // Ensure history list is rendered
+    renderChatHistoryList();
 }
 
-// --- Modal Management ---
 function openModal(modalElement) {
-    if (modalElement) {
-        modalElement.classList.add('active');
-        // Optional: Trap focus, disable body scroll for accessibility
-    }
+    if (modalElement) modalElement.classList.add('active');
 }
 function closeModal(modalElement) {
-    if (modalElement) {
-        modalElement.classList.remove('active');
-    }
+    if (modalElement) modalElement.classList.remove('active');
 }
 
-// --- App Settings Management ---
 function loadAppSettings() {
     try {
         const settings = localStorage.getItem("vellyAI_appSettings_v1");
@@ -152,100 +142,76 @@ function loadAppSettings() {
             currentModel = parsedSettings.model || "deepseek-ai/DeepSeek-V3-0324";
             activeAiCharacterId = parsedSettings.activeAiCharacterId || null;
             activeUserPersonaId = parsedSettings.activeUserPersonaId || null;
-
             appSettingsApiKeyInput.value = chutesApiKey;
             appSettingsModelSelect.value = currentModel;
         }
-    } catch (error) {
-        console.error("Error loading app settings:", error);
-    }
+    } catch (error) { console.error("Error loading app settings:", error); }
 }
-
 function saveAppSettingsToStorage() {
     try {
         localStorage.setItem("vellyAI_appSettings_v1", JSON.stringify({
-            apiKey: chutesApiKey,
-            model: currentModel,
-            activeAiCharacterId: activeAiCharacterId,
-            activeUserPersonaId: activeUserPersonaId
+            apiKey: chutesApiKey, model: currentModel,
+            activeAiCharacterId: activeAiCharacterId, activeUserPersonaId: activeUserPersonaId
         }));
-    } catch (error) {
-        console.error("Error saving app settings:", error);
-    }
+    } catch (error) { console.error("Error saving app settings:", error); }
 }
 
-// --- AI Character Management ---
 function loadAiCharacters() {
     try {
         const stored = localStorage.getItem("vellyAI_aiCharacters_v1");
         aiCharacters = stored ? JSON.parse(stored) : [];
-        if (aiCharacters.length === 0) { // Create a default Velly if none exist
+        if (aiCharacters.length === 0) {
             const defaultVelly = {
-                id: generateId(),
-                name: "Velly",
-                imageUrl: "", // No default image, will use SVG
-                age: "N/A",
-                sex: "AI",
-                description: "Your default friendly AI assistant.",
-                personality: DEFAULT_VELLY_SYSTEM_PROMPT
+                id: generateId(), name: "Velly", imageUrl: "", age: "N/A", sex: "AI",
+                description: "Your default friendly AI assistant.", personality: DEFAULT_VELLY_SYSTEM_PROMPT
             };
             aiCharacters.push(defaultVelly);
-            saveAiCharactersToStorage();
-            if (!activeAiCharacterId) activeAiCharacterId = defaultVelly.id; // Set as active if no active one
+            saveAiCharactersToStorage(); // This also calls populateAiCharacterSelect
+            if (!activeAiCharacterId) activeAiCharacterId = defaultVelly.id;
         }
         if (!activeAiCharacterId && aiCharacters.length > 0) {
-            activeAiCharacterId = aiCharacters[0].id; // Default to first if none active
+            activeAiCharacterId = aiCharacters[0].id;
         }
-         // Ensure activeAiCharacterId is valid
         if (activeAiCharacterId && !aiCharacters.find(c => c.id === activeAiCharacterId)) {
             activeAiCharacterId = aiCharacters.length > 0 ? aiCharacters[0].id : null;
         }
-        populateAiCharacterSelect();
-        updateChatHeaderBasedOnAiCharacter();
-    } catch (e) {
-        console.error("Error loading AI characters:", e);
-        aiCharacters = [];
-    }
+        populateAiCharacterSelect(); // Ensure this is called
+        // updateChatHeaderBasedOnAiCharacter(); // Called in init after this
+    } catch (e) { console.error("Error loading AI characters:", e); aiCharacters = []; }
 }
-
 function saveAiCharactersToStorage() {
     localStorage.setItem("vellyAI_aiCharacters_v1", JSON.stringify(aiCharacters));
     populateAiCharacterSelect();
 }
-
 function populateAiCharacterSelect() {
-    aiCharacterSelect.innerHTML = '<option value="">-- Select AI Character --</option>';
+    aiCharacterSelect.innerHTML = ''; // No "Select AI Character" default, active one is always selected
+    if (aiCharacters.length === 0) {
+        aiCharacterSelect.innerHTML = '<option value="">No AI Characters Available</option>';
+        editSelectedAiCharacterButton.disabled = true;
+        deleteSelectedAiCharacterButton.disabled = true;
+        return;
+    }
     aiCharacters.forEach(char => {
         const option = document.createElement("option");
         option.value = char.id;
         option.textContent = char.name;
-        if (char.id === activeAiCharacterId) {
-            option.selected = true;
-        }
+        if (char.id === activeAiCharacterId) option.selected = true;
         aiCharacterSelect.appendChild(option);
     });
-    // Disable edit/delete if no character selected or if "Select AI" is chosen
-    const noCharSelected = !activeAiCharacterId || aiCharacterSelect.value === "";
-    editSelectedAiCharacterButton.disabled = noCharSelected;
-    deleteSelectedAiCharacterButton.disabled = noCharSelected || (aiCharacters.length <=1 && noCharSelected); // Cant delete last
+    editSelectedAiCharacterButton.disabled = false;
+    deleteSelectedAiCharacterButton.disabled = aiCharacters.length <= 1;
 }
-
 function handleAiCharacterFormSubmit() {
     const character = {
         id: editingAiCharacterId || generateId(),
         name: aiCharNameInput.value.trim(),
         imageUrl: aiCharImageUrlInput.value.trim(),
-        age: aiCharAgeInput.value,
+        age: aiCharAgeInput.value.trim(),
         sex: aiCharSexInput.value.trim(),
         description: aiCharDescriptionTextarea.value.trim(),
-        personality: aiCharPersonalityTextarea.value.trim() || DEFAULT_VELLY_SYSTEM_PROMPT
+        personality: aiCharPersonalityTextarea.value.trim() // Allow empty, will use default logic in sendMessage
     };
-
-    if (!character.name) {
-        alert("Character Name is required.");
-        return;
-    }
-
+    if (!character.name) { alert("Character Name is required."); return; }
     if (editingAiCharacterId) {
         const index = aiCharacters.findIndex(c => c.id === editingAiCharacterId);
         if (index > -1) aiCharacters[index] = character;
@@ -253,11 +219,10 @@ function handleAiCharacterFormSubmit() {
         aiCharacters.push(character);
     }
     saveAiCharactersToStorage();
-    setActiveAiCharacter(character.id); // Set new/edited character as active
+    setActiveAiCharacter(character.id);
     hideAiCharacterForm();
     editingAiCharacterId = null;
 }
-
 function showAiCharacterForm(characterToEdit = null) {
     if (characterToEdit) {
         editingAiCharacterId = characterToEdit.id;
@@ -271,21 +236,15 @@ function showAiCharacterForm(characterToEdit = null) {
     } else {
         editingAiCharacterId = null;
         aiCharacterFormTitle.textContent = "Create New AI Character";
-        aiCharNameInput.value = "";
-        aiCharImageUrlInput.value = "";
-        aiCharAgeInput.value = "";
-        aiCharSexInput.value = "";
-        aiCharDescriptionTextarea.value = "";
-        aiCharPersonalityTextarea.value = ""; // Or a template
+        aiCharNameInput.value = ""; aiCharImageUrlInput.value = ""; aiCharAgeInput.value = "";
+        aiCharSexInput.value = ""; aiCharDescriptionTextarea.value = ""; aiCharPersonalityTextarea.value = "";
     }
     aiCharacterFormContainer.style.display = "block";
 }
-
 function hideAiCharacterForm() {
     aiCharacterFormContainer.style.display = "none";
     editingAiCharacterId = null;
 }
-
 function deleteSelectedAiCharacter() {
     const selectedId = aiCharacterSelect.value;
     if (!selectedId || aiCharacters.length <= 1) {
@@ -297,19 +256,25 @@ function deleteSelectedAiCharacter() {
         if (activeAiCharacterId === selectedId) {
             setActiveAiCharacter(aiCharacters.length > 0 ? aiCharacters[0].id : null);
         }
-        saveAiCharactersToStorage();
-        if (aiCharacters.length === 0) hideAiCharacterForm(); // Hide form if all deleted
+        saveAiCharactersToStorage(); // This calls populate
+        if (aiCharacters.length === 0) hideAiCharacterForm();
     }
 }
-
 function setActiveAiCharacter(characterId) {
     activeAiCharacterId = characterId;
-    saveAppSettingsToStorage(); // Save active character ID
-    populateAiCharacterSelect(); // To update selection in dropdown
+    saveAppSettingsToStorage();
+    populateAiCharacterSelect(); // Ensures dropdown reflects the change
     updateChatHeaderBasedOnAiCharacter();
-    addWelcomeMessageIfNeeded(); // Potentially new welcome message
+    // If current chat is empty, add new welcome message
+    if (currentChat && currentChat.messages.length === 0) {
+         addWelcomeMessageIfNeeded();
+    } else if (currentChat && currentChat.messages.length === 1 && currentChat.messages[0].isWelcome) {
+        // If only a welcome message exists, replace it
+        messages = []; // Clear existing welcome
+        currentChat.messages = [];
+        addWelcomeMessageIfNeeded();
+    }
 }
-
 function updateChatHeaderBasedOnAiCharacter() {
     const character = aiCharacters.find(c => c.id === activeAiCharacterId);
     if (character) {
@@ -319,60 +284,46 @@ function updateChatHeaderBasedOnAiCharacter() {
         } else {
             chatHeaderIconContainer.innerHTML = icons.botDefaultIcon;
         }
-    } else { // Fallback if no character is active or found
+    } else {
         chatHeaderTitle.textContent = "VellyAI";
         chatHeaderIconContainer.innerHTML = icons.botDefaultIcon;
     }
 }
 
-
-// --- User Persona Management ---
 function loadUserPersonas() {
     try {
         const stored = localStorage.getItem("vellyAI_userPersonas_v1");
         userPersonas = stored ? JSON.parse(stored) : [];
-         // Ensure activeUserPersonaId is valid or null
         if (activeUserPersonaId && !userPersonas.find(p => p.id === activeUserPersonaId)) {
-            activeUserPersonaId = null; // No default active persona
+            activeUserPersonaId = null;
         }
         populateUserPersonaSelect();
-    } catch (e) {
-        console.error("Error loading user personas:", e);
-        userPersonas = [];
-    }
+    } catch (e) { console.error("Error loading user personas:", e); userPersonas = []; }
 }
 function saveUserPersonasToStorage() {
     localStorage.setItem("vellyAI_userPersonas_v1", JSON.stringify(userPersonas));
     populateUserPersonaSelect();
 }
-
 function populateUserPersonaSelect() {
     userPersonaSelect.innerHTML = '<option value="">-- No User Persona --</option>';
     userPersonas.forEach(persona => {
         const option = document.createElement("option");
         option.value = persona.id;
         option.textContent = persona.name;
-        if (persona.id === activeUserPersonaId) {
-            option.selected = true;
-        }
+        if (persona.id === activeUserPersonaId) option.selected = true;
         userPersonaSelect.appendChild(option);
     });
-    // Disable edit/delete if no persona selected or if "No User Persona" is chosen
     const noPersonaSelected = !activeUserPersonaId || userPersonaSelect.value === "";
     editSelectedUserPersonaButton.disabled = noPersonaSelected;
     deleteSelectedUserPersonaButton.disabled = noPersonaSelected;
 }
-
 function handleUserPersonaFormSubmit() {
     const persona = {
         id: editingUserPersonaId || generateId(),
         name: userPersonaNameInput.value.trim(),
         description: userPersonaDescriptionTextarea.value.trim()
     };
-    if (!persona.name) {
-        alert("Persona Name is required.");
-        return;
-    }
+    if (!persona.name) { alert("Persona Name is required."); return; }
     if (editingUserPersonaId) {
         const index = userPersonas.findIndex(p => p.id === editingUserPersonaId);
         if (index > -1) userPersonas[index] = persona;
@@ -380,11 +331,10 @@ function handleUserPersonaFormSubmit() {
         userPersonas.push(persona);
     }
     saveUserPersonasToStorage();
-    setActiveUserPersona(persona.id); // Set new/edited persona as active
+    setActiveUserPersona(persona.id);
     hideUserPersonaForm();
     editingUserPersonaId = null;
 }
-
 function showUserPersonaForm(personaToEdit = null) {
     if (personaToEdit) {
         editingUserPersonaId = personaToEdit.id;
@@ -394,8 +344,7 @@ function showUserPersonaForm(personaToEdit = null) {
     } else {
         editingUserPersonaId = null;
         userPersonaFormTitle.textContent = "Create New User Persona";
-        userPersonaNameInput.value = "";
-        userPersonaDescriptionTextarea.value = "";
+        userPersonaNameInput.value = ""; userPersonaDescriptionTextarea.value = "";
     }
     userPersonaFormContainer.style.display = "block";
 }
@@ -403,65 +352,46 @@ function hideUserPersonaForm() {
     userPersonaFormContainer.style.display = "none";
     editingUserPersonaId = null;
 }
-
 function deleteSelectedUserPersona() {
     const selectedId = userPersonaSelect.value;
-    if (!selectedId) {
-        alert("Please select a user persona to delete.");
-        return;
-    }
+    if (!selectedId) { alert("Please select a user persona to delete."); return; }
     if (confirm(`Are you sure you want to delete the user persona: ${userPersonas.find(p=>p.id === selectedId)?.name}?`)) {
         userPersonas = userPersonas.filter(p => p.id !== selectedId);
-        if (activeUserPersonaId === selectedId) {
-            setActiveUserPersona(null); // Deactivate if deleted
-        }
+        if (activeUserPersonaId === selectedId) setActiveUserPersona(null);
         saveUserPersonasToStorage();
-         if (userPersonas.length === 0) hideUserPersonaForm();
+        if (userPersonas.length === 0) hideUserPersonaForm();
     }
 }
 function setActiveUserPersona(personaId) {
-    activeUserPersonaId = personaId; // Can be null
-    saveAppSettingsToStorage(); // Save active persona ID
+    activeUserPersonaId = personaId;
+    saveAppSettingsToStorage();
     populateUserPersonaSelect();
 }
 
-// --- Chat History Management (Adapting from original) ---
 function loadChatHistory() {
     try {
-        const storedChats = localStorage.getItem("vellyAI_chats_v3"); // New version for new UI
-        if (storedChats) {
-            chats = JSON.parse(storedChats);
-            if (chats.length === 0) chats = [createNewChatObject()];
-        } else {
-            chats = [createNewChatObject()];
-        }
+        const storedChats = localStorage.getItem("vellyAI_chats_v3");
+        chats = storedChats ? JSON.parse(storedChats) : [createNewChatObject()];
+        if (chats.length === 0) chats = [createNewChatObject()]; // Ensure at least one chat
 
         const lastActiveChatId = localStorage.getItem("vellyAI_lastActiveChatId_v3");
         currentChat = chats.find(chat => chat.id === lastActiveChatId) || chats[0];
-
         messages = [...currentChat.messages];
     } catch (error) {
         console.error("Error loading chat history:", error);
-        currentChat = createNewChatObject();
-        chats = [currentChat];
-        messages = [];
+        currentChat = createNewChatObject(); chats = [currentChat]; messages = [];
     }
     renderChatHistoryList();
-    // updateChatHeaderTitle(currentChat.title); // Done by updateChatHeaderBasedOnAiCharacter
 }
-
 function saveChatHistory() {
     try {
         currentChat.messages = [...messages];
         let chatIndex = chats.findIndex(chat => chat.id === currentChat.id);
-
         if (chatIndex !== -1) {
-            // Auto-title logic (can be refined or kept simple)
-            if ((chats[chatIndex].title === "New Chat" || !chats[chatIndex].title) && messages.length > 0) {
+            if ((chats[chatIndex].title === "New Chat" || !chats[chatIndex].title || chats[chatIndex].title.endsWith(" Chat") || chats[chatIndex].title.endsWith(" Welcome")) && messages.length > 0) {
                 const firstUserMessage = messages.find(m => m.role === 'user' && !m.isWelcome);
                 if (firstUserMessage) {
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = firstUserMessage.content;
+                    const tempDiv = document.createElement('div'); tempDiv.innerHTML = firstUserMessage.content;
                     const plainText = (tempDiv.textContent || tempDiv.innerText || "").trim();
                     currentChat.title = plainText.substring(0, 35) + (plainText.length > 35 ? "..." : "") || "Chat";
                 } else if (messages.length > 0 && messages[0].role === 'assistant' && messages[0].isWelcome) {
@@ -469,171 +399,123 @@ function saveChatHistory() {
                     currentChat.title = activeChar ? `${activeChar.name} Welcome` : "Welcome Chat";
                 }
             }
+             if (messages.length === 0 && !(currentChat.title && currentChat.title.endsWith(" Welcome"))) { // If chat becomes empty and wasn't a welcome chat
+                const activeChar = aiCharacters.find(c => c.id === activeAiCharacterId);
+                currentChat.title = activeChar ? `${activeChar.name} Chat` : "New Chat";
+            }
             chats[chatIndex] = {...currentChat};
-        } else { // Should not happen if currentChat is always from `chats`
+        } else {
             chats.unshift({...currentChat});
         }
-
         localStorage.setItem("vellyAI_chats_v3", JSON.stringify(chats));
         localStorage.setItem("vellyAI_lastActiveChatId_v3", currentChat.id);
-        renderChatHistoryList(); // Update titles in history list
-        // updateChatHeaderTitle(currentChat.title); // Header title is now AI character based primarily
-    } catch (error) {
-        console.error("Error saving chat history:", error);
-    }
+        renderChatHistoryList();
+    } catch (error) { console.error("Error saving chat history:", error); }
 }
-
-function createNewChatObject() { // Renamed from createNewChat to avoid conflict
+function createNewChatObject() {
     const activeChar = aiCharacters.find(c => c.id === activeAiCharacterId);
     return {
         id: generateId(),
-        title: activeChar ? `${activeChar.name} Chat` : "New Chat", // Initial title based on AI char
-        messages: [],
-        // Optionally store activeAiCharacterId and activeUserPersonaId with the chat for restoration
-        // associatedAiCharacterId: activeAiCharacterId,
-        // associatedUserPersonaId: activeUserPersonaId
+        title: activeChar ? `${activeChar.name} Chat` : "New Chat",
+        messages: []
     };
 }
-
-function renderChatHistoryList() { // Mostly same as original
+function renderChatHistoryList() {
     if (!historyList) return;
     historyList.innerHTML = '';
     chats.forEach(chat => {
         const item = document.createElement('li');
-        item.className = 'history-item';
-        item.dataset.id = chat.id;
-        if (chat.id === currentChat.id) {
-            item.classList.add('active-chat');
-        }
-
+        item.className = 'history-item'; item.dataset.id = chat.id;
+        if (chat.id === currentChat.id) item.classList.add('active-chat');
         const titleSpan = document.createElement('span');
-        titleSpan.className = 'history-item-title';
-        titleSpan.textContent = chat.title || 'Chat';
-        titleSpan.title = chat.title || 'Chat'; // Tooltip
-        titleSpan.addEventListener('click', () => {
-            loadChat(chat.id);
-            closeSidebarAndCleanup();
-        });
-
-        const actionsDiv = document.createElement('div');
-        actionsDiv.className = 'history-item-actions';
+        titleSpan.className = 'history-item-title'; titleSpan.textContent = chat.title || 'Chat';
+        titleSpan.title = chat.title || 'Chat';
+        titleSpan.addEventListener('click', () => { loadChat(chat.id); closeSidebarAndCleanup(); });
+        const actionsDiv = document.createElement('div'); actionsDiv.className = 'history-item-actions';
         const renameButton = document.createElement('button');
-        renameButton.className = 'history-action-btn rename-chat-btn';
-        renameButton.title = 'Rename Chat';
+        renameButton.className = 'history-action-btn rename-chat-btn'; renameButton.title = 'Rename Chat';
         renameButton.innerHTML = icons.historyEdit;
         renameButton.onclick = (e) => { e.stopPropagation(); renameChatInHistory(chat.id); };
         const deleteButton = document.createElement('button');
-        deleteButton.className = 'history-action-btn delete-chat-btn';
-        deleteButton.title = 'Delete Chat';
+        deleteButton.className = 'history-action-btn delete-chat-btn'; deleteButton.title = 'Delete Chat';
         deleteButton.innerHTML = icons.historyDelete;
         deleteButton.onclick = (e) => { e.stopPropagation(); deleteChatFromHistory(chat.id); };
-        actionsDiv.appendChild(renameButton);
-        actionsDiv.appendChild(deleteButton);
-        item.appendChild(titleSpan);
-        item.appendChild(actionsDiv);
+        actionsDiv.appendChild(renameButton); actionsDiv.appendChild(deleteButton);
+        item.appendChild(titleSpan); item.appendChild(actionsDiv);
         historyList.appendChild(item);
     });
 }
-
-function renameChatInHistory(chatId) { // Mostly same
+function renameChatInHistory(chatId) {
     const chatIndex = chats.findIndex(c => c.id === chatId);
     if (chatIndex === -1) return;
     const currentTitle = chats[chatIndex].title;
     const newTitle = prompt("Enter new chat title:", (currentTitle === "New Chat" || currentTitle.endsWith(" Chat") || currentTitle.endsWith(" Welcome")) ? "" : currentTitle);
     if (newTitle !== null && newTitle.trim() !== "") {
         chats[chatIndex].title = newTitle.trim();
-        if (currentChat.id === chatId) {
-            currentChat.title = newTitle.trim();
-            // updateChatHeaderTitle(currentChat.title); // No longer needed, AI char dictates header title
-        }
+        if (currentChat.id === chatId) currentChat.title = newTitle.trim();
         saveChatHistory();
     }
 }
-function deleteChatFromHistory(chatId) { // Mostly same
-    if (!confirm("Are you sure you want to delete this chat? This action cannot be undone.")) return;
+function deleteChatFromHistory(chatId) {
+    if (!confirm("Are you sure you want to delete this chat?")) return;
     const chatIndex = chats.findIndex(c => c.id === chatId);
     if (chatIndex === -1) return;
     chats.splice(chatIndex, 1);
     if (currentChat.id === chatId) {
-        if (chats.length > 0) {
-            loadChat(chats[0].id);
-        } else {
-            startNewChatSession(); // Renamed
-        }
+        if (chats.length > 0) loadChat(chats[0].id);
+        else startNewChatSession();
     } else {
-        saveChatHistory(); // Just re-render the list and save
+        saveChatHistory();
     }
 }
-
-function startNewChatSession() { // Renamed from startNewChat
+function startNewChatSession() {
     currentChat = createNewChatObject();
     chats.unshift(currentChat);
     messages = [];
-    saveChatHistory(); // Save the new empty chat
-    addWelcomeMessageIfNeeded(); // Add welcome message for the new chat
+    saveChatHistory();
+    addWelcomeMessageIfNeeded();
     renderMessages();
-    // updateChatHeaderTitle(currentChat.title); // Handled by AI character logic
     messageInput.focus();
 }
-
-function loadChat(id) { // Mostly same
+function loadChat(id) {
     const chatToLoad = chats.find(chat => chat.id === id);
     if (chatToLoad) {
         currentChat = chatToLoad;
         messages = [...chatToLoad.messages];
         localStorage.setItem("vellyAI_lastActiveChatId_v3", currentChat.id);
         renderMessages();
-        renderChatHistoryList(); // Highlight active chat
-        // updateChatHeaderTitle(currentChat.title); // Handled by AI character logic
-
-        // Optional: Restore AI Character/User Persona associated with this chat
-        // if (chatToLoad.associatedAiCharacterId) setActiveAiCharacter(chatToLoad.associatedAiCharacterId);
-        // if (chatToLoad.associatedUserPersonaId) setActiveUserPersona(chatToLoad.associatedUserPersonaId);
-
-        addWelcomeMessageIfNeeded(); // Check if this chat needs a welcome message
+        renderChatHistoryList();
+        addWelcomeMessageIfNeeded();
     }
 }
-
 function addWelcomeMessageIfNeeded() {
     if (messages.length === 0) {
         const activeChar = aiCharacters.find(c => c.id === activeAiCharacterId);
         const welcomeText = activeChar ? `Hello! (purple)I'm ${activeChar.name}.(white) How can I help you today?` : "Hello! How can I help you today?";
         const welcomeMsg = {
-            role: "assistant",
-            content: processText(welcomeText).text,
-            timestamp: new Date().toISOString(),
-            isWelcome: true
+            role: "assistant", content: processText(welcomeText).text,
+            timestamp: new Date().toISOString(), isWelcome: true
         };
         messages.push(welcomeMsg);
-        saveChatHistory(); // Save chat with the new welcome message
-        renderMessages();
+        saveChatHistory(); renderMessages();
     }
 }
 
-// --- Message Processing & Rendering (Adapting from original) ---
 function generateId() { return Date.now().toString(36) + Math.random().toString(36).substring(2, 7); }
-
-function processText(rawText) { // Same as original
-    let text = rawText;
-    let color = null;
+function processText(rawText) {
+    let text = rawText; let color = null;
     if (text.startsWith("-B ")) { text = text.substring(3); color = "black"; }
     else if (text.startsWith("-P ")) { text = text.substring(3); color = "purple"; }
     else if (text.startsWith("-R ")) { text = text.substring(3); color = "red"; }
-
     text = text.replace(/\*(.*?)\*/g, '<em class="thinking">$1</em>');
     text = text.replace(/^#\s?(.*)/gm, '<strong class="scream">$1</strong>');
-    
     marked.setOptions({
         highlight: function (code, lang) {
             const language = hljs.getLanguage(lang) ? lang : 'plaintext';
             return hljs.highlight(code, { language, ignoreIllegals: true }).value;
-        },
-        gfm: true,
-        breaks: true,
-        sanitize: false
+        }, gfm: true, breaks: true, sanitize: false
     });
     text = marked.parse(text);
-
     text = text.replace(/\(red\)([\s\S]*?)(?=\s|$|\(|$|<)/g, '<span class="text-red">$1</span>')
                .replace(/\(purple\)([\s\S]*?)(?=\s|$|\(|$|<)/g, '<span class="text-purple">$1</span>')
                .replace(/\(black\)([\s\S]*?)(?=\s|$|\(|$|<)/g, '<span class="text-black">$1</span>')
@@ -641,71 +523,48 @@ function processText(rawText) { // Same as original
     text = text.replace(/<p>\s*<\/p>/gi, '');
     return { text: text, color: color };
 }
-
-function renderMessages() { // Mostly same
+function renderMessages() {
     if (!chatBody) return;
     chatBody.innerHTML = '';
-    messages.forEach((msg, index) => {
-        chatBody.appendChild(createMessageElement(msg, index));
-    });
+    messages.forEach((msg, index) => chatBody.appendChild(createMessageElement(msg, index)));
     scrollToBottom();
-    if (typeof hljs !== 'undefined') {
-        initCodeBlocksInChat();
-    }
+    if (typeof hljs !== 'undefined') initCodeBlocksInChat();
 }
-
-function createMessageElement(msg, index) { // Adapted for AI character avatar
+function createMessageElement(msg, index) {
     const isUser = msg.role === 'user';
     const timestamp = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
     messageDiv.dataset.index = index;
-
     const avatarDiv = document.createElement('div');
     avatarDiv.className = `avatar ${isUser ? 'user-avatar' : 'bot-avatar'}`;
-
     if (isUser) {
         avatarDiv.innerHTML = icons.userDefaultIcon;
     } else {
         const activeChar = aiCharacters.find(c => c.id === activeAiCharacterId);
         if (activeChar && activeChar.imageUrl) {
             avatarDiv.innerHTML = `<img src="${activeChar.imageUrl}" alt="${activeChar.name} avatar">`;
-        } else {
-            avatarDiv.innerHTML = icons.botDefaultIcon;
-        }
+        } else { avatarDiv.innerHTML = icons.botDefaultIcon; }
     }
     messageDiv.appendChild(avatarDiv);
-
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
+    const contentDiv = document.createElement('div'); contentDiv.className = 'message-content';
     const bubbleDiv = document.createElement('div');
     bubbleDiv.className = `message-bubble ${isUser ? 'user-bubble' : 'bot-bubble'}`;
-    if (msg.color && isUser) { bubbleDiv.classList.add(`text-${msg.color}`); }
+    if (msg.color && isUser) bubbleDiv.classList.add(`text-${msg.color}`);
     bubbleDiv.innerHTML = msg.content;
-
-    const msgInfoDiv = document.createElement('div');
-    msgInfoDiv.className = 'message-info';
-    const timeDiv = document.createElement('div');
-    timeDiv.className = 'message-time';
-    timeDiv.textContent = timestamp;
-    msgInfoDiv.appendChild(timeDiv);
-    contentDiv.appendChild(bubbleDiv);
-    contentDiv.appendChild(msgInfoDiv);
-
-    // Actions Menu (same logic as original)
+    const msgInfoDiv = document.createElement('div'); msgInfoDiv.className = 'message-info';
+    const timeDiv = document.createElement('div'); timeDiv.className = 'message-time';
+    timeDiv.textContent = timestamp; msgInfoDiv.appendChild(timeDiv);
+    contentDiv.appendChild(bubbleDiv); contentDiv.appendChild(msgInfoDiv);
     const actionsTrigger = document.createElement('button');
-    actionsTrigger.className = 'message-actions-trigger';
-    actionsTrigger.innerHTML = icons.ellipsis;
+    actionsTrigger.className = 'message-actions-trigger'; actionsTrigger.innerHTML = icons.ellipsis;
     actionsTrigger.setAttribute('aria-label', 'Message actions');
     actionsTrigger.onclick = (e) => { e.stopPropagation(); toggleActionsMenu(index); };
     const actionsMenu = document.createElement('div');
-    actionsMenu.className = 'message-actions-menu';
-    actionsMenu.id = `actions-menu-${index}`;
+    actionsMenu.className = 'message-actions-menu'; actionsMenu.id = `actions-menu-${index}`;
     actionsMenu.appendChild(createActionButton(icons.edit + ' Edit', () => editMessage(index)));
     actionsMenu.appendChild(createActionButton(icons.copy + ' Copy Text', () => {
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = msg.content;
+        const tempDiv = document.createElement('div'); tempDiv.innerHTML = msg.content;
         let textToCopy = (tempDiv.textContent || tempDiv.innerText || "").replace(/\*(.*?)\*/g, '$1').replace(/^#\s?(.*)/gm, '$1');
         copyToClipboard(textToCopy, actionsMenu.querySelector('.action-button:nth-child(2)'));
     }));
@@ -713,38 +572,26 @@ function createMessageElement(msg, index) { // Adapted for AI character avatar
         actionsMenu.appendChild(createActionButton(icons.regenerate + ' Regenerate', () => regenerateResponse(index)));
     }
     actionsMenu.appendChild(createActionButton(icons.delete + ' Delete', () => deleteMessage(index), 'delete'));
-    contentDiv.appendChild(actionsTrigger);
-    contentDiv.appendChild(actionsMenu);
-    messageDiv.appendChild(contentDiv);
-    return messageDiv;
+    contentDiv.appendChild(actionsTrigger); contentDiv.appendChild(actionsMenu);
+    messageDiv.appendChild(contentDiv); return messageDiv;
 }
-// createActionButton, toggleActionsMenu, closeAllActionMenus - Same as original
 function createActionButton(innerHTML, onClick, additionalClass = '') {
     const button = document.createElement('button');
-    button.className = 'action-button';
-    if (additionalClass) button.classList.add(additionalClass);
+    button.className = 'action-button'; if (additionalClass) button.classList.add(additionalClass);
     button.innerHTML = innerHTML;
-    button.addEventListener('click', (e) => {
-        e.stopPropagation();
-        onClick();
-        closeAllActionMenus();
-    });
+    button.addEventListener('click', (e) => { e.stopPropagation(); onClick(); closeAllActionMenus(); });
     return button;
 }
 function toggleActionsMenu(index) {
     const menu = document.getElementById(`actions-menu-${index}`);
     const isActive = menu.classList.contains('active');
-    closeAllActionMenus();
-    if (!isActive) menu.classList.add('active');
+    closeAllActionMenus(); if (!isActive) menu.classList.add('active');
 }
 function closeAllActionMenus() {
     document.querySelectorAll('.message-actions-menu.active').forEach(m => m.classList.remove('active'));
 }
-
-// getRawTextFromHtml, editMessage, saveEditedMessage, cancelEdit, cancelEditCleanup, deleteMessage, regenerateResponse - Same as original
 function getRawTextFromHtml(htmlContent) {
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = htmlContent;
+    const tempDiv = document.createElement('div'); tempDiv.innerHTML = htmlContent;
     tempDiv.querySelectorAll('em.thinking').forEach(el => el.replaceWith(`*${el.textContent}*`));
     tempDiv.querySelectorAll('strong.scream').forEach(el => el.replaceWith(`# ${el.textContent}`));
     tempDiv.querySelectorAll('span.text-red').forEach(el => el.replaceWith(`(red)${el.innerHTML}`));
@@ -764,8 +611,7 @@ function getRawTextFromHtml(htmlContent) {
     return (tempDiv.textContent || tempDiv.innerText || "").trim();
 }
 function editMessage(index) {
-    if (editingMessage && editingMessage.index === index) return;
-    if (editingMessage) cancelEdit();
+    if (editingMessage && editingMessage.index === index) return; if (editingMessage) cancelEdit();
     const messageData = messages[index];
     const messageElement = document.querySelector(`.message[data-index="${index}"]`);
     if (!messageData || !messageElement) return;
@@ -774,10 +620,8 @@ function editMessage(index) {
     editingMessage = { index, originalBubbleHTML: bubbleElement.innerHTML };
     bubbleElement.style.display = 'none';
     const editTextArea = document.createElement('textarea');
-    editTextArea.className = 'edit-area monaco-like'; // Add monaco-like for consistency
-    editTextArea.value = rawContentForEditing;
-    const editControls = document.createElement('div');
-    editControls.className = 'edit-controls';
+    editTextArea.className = 'edit-area monaco-like'; editTextArea.value = rawContentForEditing;
+    const editControls = document.createElement('div'); editControls.className = 'edit-controls';
     const saveButton = document.createElement('button');
     saveButton.className = 'edit-button'; saveButton.textContent = 'Save';
     saveButton.onclick = () => saveEditedMessage(index, editTextArea.value);
@@ -840,9 +684,6 @@ function regenerateResponse(botMessageIndex) {
     const rawUserContent = userMessageForApi.raw || getRawTextFromHtml(userMessageForApi.content);
     sendMessage(rawUserContent, userMessageForApi.color, false);
 }
-
-
-// initCodeBlocksInChat, copyCode, adjustInputHeight, showTypingIndicator, hideTypingIndicator, scrollToBottom, copyToClipboard - Same as original
 function initCodeBlocksInChat() {
     if (typeof hljs === 'undefined') return;
     document.querySelectorAll('.message-bubble > pre > code').forEach((codeElement) => {
@@ -889,7 +730,6 @@ function showTypingIndicator() {
     const activeChar = aiCharacters.find(c => c.id === activeAiCharacterId);
     const avatarHtml = (activeChar && activeChar.imageUrl) ? `<img src="${activeChar.imageUrl}" alt="${activeChar.name} avatar">` : icons.botDefaultIcon;
     const typingName = activeChar ? activeChar.name : "Bot";
-
     const indicatorHtml = `
         <div class="message bot-message typing-indicator" id="bot-typing-indicator">
             <div class="avatar bot-avatar">${avatarHtml}</div>
@@ -917,11 +757,19 @@ function copyToClipboard(text, buttonElement) {
         }
     });
 }
-
-// --- Context Modal (Adapting from original) ---
 function showContextModal() {
     const activeChar = aiCharacters.find(c => c.id === activeAiCharacterId);
-    let systemMessageForDisplay = (activeChar && activeChar.personality) ? activeChar.personality : DEFAULT_VELLY_SYSTEM_PROMPT;
+    let systemPreamble = "";
+    if (activeChar) {
+        let charDetails = [];
+        charDetails.push(`Your name is ${activeChar.name || "AI Assistant"}.`);
+        if (activeChar.age && activeChar.age.trim() !== "") charDetails.push(`You are ${activeChar.age}${isNaN(parseInt(activeChar.age)) || activeChar.age.toLowerCase().includes("old") ? '' : ' years old'}.`);
+        if (activeChar.sex && activeChar.sex.trim() !== "") charDetails.push(`Your gender/sex is ${activeChar.sex}.`);
+        if (activeChar.description && activeChar.description.trim() !== "") charDetails.push(`Your visual appearance is: ${activeChar.description}.`);
+        systemPreamble = charDetails.join(" ") + " ";
+    }
+    const mainPersonality = (activeChar && activeChar.personality && activeChar.personality.trim() !== "") ? activeChar.personality : DEFAULT_VELLY_SYSTEM_PROMPT;
+    const systemMessageForDisplay = `${systemPreamble.trim()}\n\nYour core instructions, personality, and how you should behave are as follows:\n${mainPersonality}`;
 
     let apiMessagesForDisplay = [{ role: "system", content: systemMessageForDisplay }];
     const contextWindow = messages.slice(-15);
@@ -945,8 +793,6 @@ function showContextModal() {
     });
     openModal(contextModal);
 }
-
-// --- Sidebar Open/Close Helper (Same as original) ---
 function openSidebar() {
     if (sidebar && !sidebar.classList.contains('open')) {
         sidebar.classList.add('open');
@@ -967,7 +813,6 @@ function handleClickOutsideSidebar(event) {
     }
 }
 
-// --- sendMessage (Main API Call Logic - Heavily Adapted) ---
 async function sendMessage(userRawInput, userBubbleColor, addUserMessageToList = true) {
     const trimmedInput = userRawInput.trim();
     if (!trimmedInput && addUserMessageToList) return;
@@ -1004,28 +849,50 @@ async function sendMessage(userRawInput, userBubbleColor, addUserMessageToList =
     saveChatHistory();
 
     const activeChar = aiCharacters.find(c => c.id === activeAiCharacterId);
-    let systemMessageForApi = (activeChar && activeChar.personality) ? activeChar.personality : DEFAULT_VELLY_SYSTEM_PROMPT;
+    let systemMessageForApi = "";
+    let characterPreamble = "";
 
-    const apiMessagePayload = [{ role: "system", content: systemMessageForApi }];
-    let historyForApi = messages.slice(-105); // Max history window
-    if (addUserMessageToList && historyForApi.length > 0) { // Don't include the current user message if it was just added
-        historyForApi = historyForApi.slice(0, -1);
+    if (activeChar) {
+        let characterDetails = [];
+        characterDetails.push(`Your name is ${activeChar.name || "AI Assistant"}.`);
+        if (activeChar.age && activeChar.age.trim() !== "") {
+            characterDetails.push(`You are ${activeChar.age}${isNaN(parseInt(activeChar.age)) || activeChar.age.toLowerCase().includes("old") ? '' : ' years old'}.`);
+        }
+        if (activeChar.sex && activeChar.sex.trim() !== "") {
+            characterDetails.push(`Your gender/sex is ${activeChar.sex}.`);
+        }
+        if (activeChar.description && activeChar.description.trim() !== "") {
+            characterDetails.push(`Your visual appearance is: ${activeChar.description}.`);
+        }
+        characterPreamble = characterDetails.join(" ") + " ";
+        const mainPersonalityPrompt = (activeChar.personality && activeChar.personality.trim() !== "")
+                                      ? activeChar.personality
+                                      : DEFAULT_VELLY_SYSTEM_PROMPT;
+        systemMessageForApi = `${characterPreamble.trim()}\n\nYour core instructions, personality, and how you should behave are as follows:\n${mainPersonalityPrompt}`;
+    } else {
+        systemMessageForApi = DEFAULT_VELLY_SYSTEM_PROMPT;
     }
 
+    const apiMessagePayload = [{ role: "system", content: systemMessageForApi }];
+    let historyForApi = messages.slice(-105);
+    if (addUserMessageToList && historyForApi.length > 0) {
+        historyForApi = historyForApi.slice(0, -1);
+    }
     historyForApi.forEach(msg => {
         if (msg.role === "user") {
             let userContentForApi = msg.raw || getRawTextFromHtml(msg.content);
-            // Prepend persona only if it's not the *very current* turn being sent
-            // (already handled for currentUserTurnContentForApi)
+            // Persona for historical messages is not added here; it's part of the current turn or system context.
             apiMessagePayload.push({ role: "user", content: userContentForApi.trim() });
         } else if (msg.role === "assistant") {
             apiMessagePayload.push({ role: "assistant", content: (msg.raw || getRawTextFromHtml(msg.content)).trim() });
         }
     });
-
-    if (trimmedInput) { // Add the current user's input
+    if (trimmedInput) {
         apiMessagePayload.push({ role: "user", content: currentUserTurnContentForApi.trim() });
     }
+
+    // console.log("Final System Prompt for API:", systemMessageForApi); // For debugging
+    // console.log("Final API Messages to be sent:", JSON.parse(JSON.stringify(apiMessagePayload))); // For debugging
 
     try {
         const response = await fetch(API_URL, {
@@ -1033,7 +900,7 @@ async function sendMessage(userRawInput, userBubbleColor, addUserMessageToList =
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${chutesApiKey}` },
             body: JSON.stringify({
                 model: currentModel, messages: apiMessagePayload, stream: false,
-                max_tokens: 1500, temperature: 0.75
+                max_tokens: 2048, temperature: 0.75 // Increased max_tokens for longer responses
             })
         });
         hideTypingIndicator();
@@ -1071,7 +938,6 @@ async function sendMessage(userRawInput, userBubbleColor, addUserMessageToList =
     }
 }
 
-// --- Event Listeners ---
 function setupEventListeners() {
     messageInput.addEventListener('input', adjustInputHeight);
     sendButton.addEventListener('click', () => {
@@ -1087,33 +953,23 @@ function setupEventListeners() {
             sendMessage(messageInput.value, detectedColor);
         }
     });
-
     if (menuButton) {
         menuButton.addEventListener('click', (event) => {
             event.stopPropagation();
-            if (sidebar.classList.contains('open')) closeSidebarAndCleanup();
-            else openSidebar();
+            if (sidebar.classList.contains('open')) closeSidebarAndCleanup(); else openSidebar();
         });
     }
     if (sidebarClose) sidebarClose.addEventListener('click', closeSidebarAndCleanup);
     if (newChatButton) {
-        newChatButton.addEventListener('click', () => {
-            startNewChatSession();
-            closeSidebarAndCleanup();
-        });
+        newChatButton.addEventListener('click', () => { startNewChatSession(); closeSidebarAndCleanup(); });
     }
-
-    // Sidebar tabs (only history now)
     sidebarTabsElements.forEach(tab => {
         tab.addEventListener('click', () => {
             sidebarTabsElements.forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
-            // Only history tab content is directly in sidebar now
             historyTabContent.style.display = tab.dataset.tab === 'history' ? 'block' : 'none';
         });
     });
-
-    // App Settings Modal
     if (appSettingsButton) appSettingsButton.addEventListener('click', () => openModal(appSettingsModal));
     if (appSettingsModalCloseButton) appSettingsModalCloseButton.addEventListener('click', () => closeModal(appSettingsModal));
     if (saveAppSettingsButton) {
@@ -1121,75 +977,53 @@ function setupEventListeners() {
             chutesApiKey = appSettingsApiKeyInput.value.trim();
             currentModel = appSettingsModelSelect.value;
             saveAppSettingsToStorage();
-            alert('App Settings saved!');
-            closeModal(appSettingsModal);
+            alert('App Settings saved!'); closeModal(appSettingsModal);
         });
     }
-    // Profiles Modal
     if (profilesButton) profilesButton.addEventListener('click', () => {
-        populateAiCharacterSelect(); // Ensure dropdowns are fresh
-        populateUserPersonaSelect();
-        hideAiCharacterForm(); // Ensure forms are hidden initially
-        hideUserPersonaForm();
+        populateAiCharacterSelect(); populateUserPersonaSelect();
+        hideAiCharacterForm(); hideUserPersonaForm();
         openModal(profilesModal);
     });
     if (profilesModalCloseButton) profilesModalCloseButton.addEventListener('click', () => closeModal(profilesModal));
-
     modalTabs.forEach(tab => {
         tab.addEventListener('click', () => {
             modalTabs.forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
             profilesModal.querySelectorAll('.modal-tab-panel').forEach(panel => panel.style.display = 'none');
             document.getElementById(tab.dataset.tab).style.display = 'block';
-            hideAiCharacterForm(); // Hide forms when switching tabs
-            hideUserPersonaForm();
+            hideAiCharacterForm(); hideUserPersonaForm();
         });
     });
-
-    // AI Character Listeners
     if (createNewAiCharacterButton) createNewAiCharacterButton.addEventListener('click', () => showAiCharacterForm());
     if (editSelectedAiCharacterButton) editSelectedAiCharacterButton.addEventListener('click', () => {
         const selectedId = aiCharacterSelect.value;
         const charToEdit = aiCharacters.find(c => c.id === selectedId);
-        if (charToEdit) showAiCharacterForm(charToEdit);
-        else alert("Please select an AI character to edit.");
+        if (charToEdit) showAiCharacterForm(charToEdit); else alert("Select AI character to edit.");
     });
     if (deleteSelectedAiCharacterButton) deleteSelectedAiCharacterButton.addEventListener('click', deleteSelectedAiCharacter);
     if (saveAiCharacterButton) saveAiCharacterButton.addEventListener('click', handleAiCharacterFormSubmit);
     if (cancelAiCharacterButton) cancelAiCharacterButton.addEventListener('click', hideAiCharacterForm);
     if (aiCharacterSelect) aiCharacterSelect.addEventListener('change', (e) => {
-        setActiveAiCharacter(e.target.value);
-        // Optionally auto-start a new chat or ask user if they want to
-        // For now, just changes the active character for future chats/welcome messages
-        hideAiCharacterForm(); // Hide form if selection changes
+        setActiveAiCharacter(e.target.value); hideAiCharacterForm();
     });
-
-
-    // User Persona Listeners
     if (createNewUserPersonaButton) createNewUserPersonaButton.addEventListener('click', () => showUserPersonaForm());
     if (editSelectedUserPersonaButton) editSelectedUserPersonaButton.addEventListener('click', () => {
         const selectedId = userPersonaSelect.value;
         const personaToEdit = userPersonas.find(p => p.id === selectedId);
-        if (personaToEdit) showUserPersonaForm(personaToEdit);
-        else alert("Please select a user persona to edit.");
+        if (personaToEdit) showUserPersonaForm(personaToEdit); else alert("Select user persona to edit.");
     });
     if (deleteSelectedUserPersonaButton) deleteSelectedUserPersonaButton.addEventListener('click', deleteSelectedUserPersona);
     if (saveUserPersonaButton) saveUserPersonaButton.addEventListener('click', handleUserPersonaFormSubmit);
     if (cancelUserPersonaButton) cancelUserPersonaButton.addEventListener('click', hideUserPersonaForm);
     if (userPersonaSelect) userPersonaSelect.addEventListener('change', (e) => {
-        setActiveUserPersona(e.target.value || null); // Allow deselecting to null
-        hideUserPersonaForm();
+        setActiveUserPersona(e.target.value || null); hideUserPersonaForm();
     });
-
-
-    // Context Modal
     if (viewContextButton) viewContextButton.addEventListener('click', showContextModal);
     if (contextModalCloseButton) contextModalCloseButton.addEventListener('click', () => closeModal(contextModal));
-    if (contextModal) contextModal.addEventListener('click', (event) => { // Close on backdrop click
+    if (contextModal) contextModal.addEventListener('click', (event) => {
         if (event.target === contextModal) closeModal(contextModal);
     });
-
-    // Close action menus on global click (from original)
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.message-actions-trigger') && !e.target.closest('.message-actions-menu')) {
             closeAllActionMenus();
@@ -1197,5 +1031,4 @@ function setupEventListeners() {
     });
 }
 
-// --- Run Initialization ---
 document.addEventListener('DOMContentLoaded', init);
